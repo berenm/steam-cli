@@ -37,6 +37,7 @@ USAGE
     install             Download and install game
     execute             Execute installed game
     list                List all available games
+    update-cache        Update cached game list
 
   Mandatory options:
     -i, --id            AppID of the game
