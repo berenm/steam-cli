@@ -104,20 +104,13 @@ vdf2file() {
 
 steamcli() {
   local username=$(cat ~/.steam/registry.vdf | vdf2json | jq -r .[].HKCU.Software.Valve.Steam.AutoLoginUser)
-  local script=$(mktemp)
-  echo "$@" | tr '+' '\n' > $script
-  echo $STEAM_CMD +@NoPromptForPassword 1 +login $username +runscript $script +quit >&2
-  $STEAM_CMD +@NoPromptForPassword 1 +login $username +runscript $script +quit
-  rm $script
+  $STEAM_CMD +@NoPromptForPassword 1 +login $username "$@" +quit
 }
 
 steamcli_login() {
   local username=$(cat ~/.steam/registry.vdf | vdf2json | jq -r .[].HKCU.Software.Valve.Steam.AutoLoginUser)
   echo -n "Password: (leave empty to use cached password) " && read -s password && echo
-  echo "$@" | tr '+' '\n' > $script
-  echo $STEAM_CMD +@NoPromptForPassword 1 +login $username +runscript $script +quit >&2
-  $STEAM_CMD +@NoPromptForPassword 1 +login $username $password +runscript $script +quit
-  rm $script
+  $STEAM_CMD +@NoPromptForPassword 1 +login $username $password "$@" +quit
 }
 
 steamcli_cache() {
@@ -175,8 +168,11 @@ steamcli_app_install() {
   fi
   local app_folder=$(steamcli_app_folder "$app_id" "$platform")
 
+  local script=$(mktemp)
+  echo "force_install_dir \"$GAMES_DIR/$app_folder\"" > "$script"
   mkdir -p "$GAMES_DIR/$app_folder"
-  steamcli +force_install_dir "\"$GAMES_DIR/$app_folder\"" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
+  steamcli +runscript "$script" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
+  rm "$script"
 }
 
 steamcli_app_execute() {
