@@ -187,6 +187,8 @@ steamcli_app_execute() {
   fi
   local app_folder=$(steamcli_app_folder "$app_id" "$platform")
 
+  [ ! -d "$GAMES_DIR/$app_folder" ] && echo "Couldn't find $GAMES_DIR/$app_folder, maybe the game isn't installed?" && return 1
+
   pushd "$GAMES_DIR/$app_folder"
   case "$platform-$bitness" in
     linux-*) "$STEAM_DIR/ubuntu12_32/steam-runtime/run.sh" ./$app_cmd;;
