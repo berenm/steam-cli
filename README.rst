@@ -22,6 +22,33 @@ Simply download steam-cli somewhere in your path.
 
 You can always get the latest version of the script from https://git.io/steam-cli
 
+USAGE
+--------------------------------------------------------------------------------
+
+::
+
+  Usage: steam-cli <command> (--id=<app-id>|--name=<app-name>)
+                             [--platform=<platform>]
+                             [--bitness=<bitness>]
+                             [--language=<language>]
+                             [--games-dir=<directory>]
+                             [--steam-dir=<directory>]
+  Commands:
+    install             Download and install game
+    execute             Execute installed game
+    list                List all available games
+
+  Mandatory options:
+    -i, --id            AppID of the game
+    -n, --name          Name of the game
+
+  Other options:
+    -p, --platform      Platform to install
+    -b, --bitness       Bitness of the platform
+    -l, --language      Language of the game to install
+    -g, --games-dir     Directory where to find installed games
+    -s, --steam-dir     Directory where to find steam [default: ~/.steam]
+
 LICENSE
 -------------------------------------------------------------------------------
 
