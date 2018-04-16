@@ -1,0 +1,208 @@
+#!/bin/bash
+
+STEAM_CMD=$(which steamcmd)
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/steam-cli/"
+
+steamcli_usage() {
+  echo "Usage: steam-cli <command> (--id=<app-id>|--name=<app-name>) [--platform=<platform>] [--bitness=<bitness>] [--language=<language>] [--games-dir=<directory>] [--steam-dir=<directory>]"
+  echo ""
+  echo "Commands:"
+  echo "  install             Download and install game"
+  echo "  execute             Execute installed game"
+  echo "  list                List all available games"
+  echo ""
+  echo "Mandatory options:"
+  echo "  -i, --id            AppID of the game"
+  echo "  -n, --name          Name of the game"
+  echo ""
+  echo "Other options:"
+  echo "  -p, --platform      Platform to install"
+  echo "  -b, --bitness       Bitness of the platform"
+  echo "  -l, --language      Language of the game to install"
+  echo "  -g, --games-dir     Directory where to find installed games"
+  echo "  -s, --steam-dir     Directory where to find steam [default: ~/.steam]"
+}
+
+steamcli_options() {
+  echo "local app_id"
+  echo "local app_name"
+  echo "local app_cmd"
+  echo "local platform=linux"
+  echo "local language=${LANG%_*}"
+  echo "STEAM_DIR=$HOME/.steam"
+  echo "GAMES_DIR=$HOME/.steam/steam/steamapps/common"
+  case "$(uname -m)" in
+    "x86_64") echo "local bitness=64";;
+    *) echo "local bitness=32";;
+  esac
+
+  command=$1; shift;
+  local params="$(getopt -o 'i:n:c:p:l:b:g:s:h' -l 'id:,name:,command:,platform:,language:,bitness:,games-dir:,steam-dir:,help' -n "$command" -- "$@")"
+  [ $? -ne 0 ] && steamcli_usage && return 1
+
+  eval set -- "$params"
+  while true; do
+    case "$1" in
+      -i|--id)
+          case "$2" in
+              "") shift 2;;
+              *) echo "local app_id=\"$2\""; shift 2;;
+          esac;;
+      -n|--name)
+          case "$2" in
+              "") shift 2;;
+              *) echo "local app_name=\"$2\""; shift 2;;
+          esac;;
+      -c|--command)
+          case "$2" in
+              "") shift 2;;
+              *) echo "local app_cmd=\"$2\""; shift 2;;
+          esac;;
+      -p|--platform)
+          case "$2" in
+              "") shift 2;;
+              *) echo "platform=\"$2\""; shift 2;;
+          esac;;
+      -l|--language)
+          case "$2" in
+              "") shift 2;;
+              *) echo "language=\"$2\""; shift 2;;
+          esac;;
+      -b|--bitness)
+          case "$2" in
+              "") shift 2;;
+              *) echo "bitness=\"$2\""; shift 2;;
+          esac;;
+      -g|--games-dir)
+          case "$2" in
+              "") shift 2;;
+              *) echo "GAMES_DIR=\"$2\""; shift 2;;
+          esac;;
+      -s|--steam-dir)
+          case "$2" in
+              "") shift 2;;
+              *) echo "STEAM_DIR=\"$2\""; shift 2;;
+          esac;;
+      -h|--help) shift;;
+      --) shift; break;;
+      *) echo "Internal error!"; exit 1;;
+    esac
+  done
+}
+
+fixutf8() {
+  echo -en "$(echo -en "$(uconv -f "UTF-8" -t "ASCII" --callback escape | sed -re 's/\\/\\\\/g; s/%X([0-9A-F]{2})/\\x\1/g')" | uconv -f "Windows-1252" -t "ASCII" --callback escape | sed -re 's/\\/\\\\/g; s/%U([0-9A-F]{4})/\\u\1/g')"
+}
+
+vdf2json() {
+  sed -re '/^\s*"[^"]*$/d; s@([^{}\"])$@\1"@g' | tr -d '\n\r' | sed -re 's@^@{@; s@\\@\\\\@g; s@\\\\"\\\\"@\\"\\"@g; s@([^\\])\\\\"@\1\\"@g; s@\s+@ @g; s@"\s*\{@": {@g; s@"\s*"(([^"\\]|\\.)*)"@": "\1",@g; s@}@},@g; s@$@}@; s@,\s*}@}@g'
+}
+
+vdf2file() {
+  mkdir -p "$1" && awk -v "dst=$1/$2" '/^"[^"]*"$/ { f=$1; gsub(/"/, "", f); printf("") > dst f ".vdf"} { print $0 >> dst f ".vdf" }'
+}
+
+steamcli() {
+  local username=$(cat ~/.steam/registry.vdf | vdf2json | jq -r .[].HKCU.Software.Valve.Steam.AutoLoginUser)
+  local script=$(mktemp)
+  echo "$@" | tr '+' '\n' > $script
+  echo $STEAM_CMD +@NoPromptForPassword 1 +login $username +runscript $script +quit >&2
+  $STEAM_CMD +@NoPromptForPassword 1 +login $username +runscript $script +quit
+  rm $script
+}
+
+steamcli_login() {
+  local username=$(cat ~/.steam/registry.vdf | vdf2json | jq -r .[].HKCU.Software.Valve.Steam.AutoLoginUser)
+  echo -n "Password: (leave empty to use cached password) " && read -s password && echo
+  echo "$@" | tr '+' '\n' > $script
+  echo $STEAM_CMD +@NoPromptForPassword 1 +login $username +runscript $script +quit >&2
+  $STEAM_CMD +@NoPromptForPassword 1 +login $username $password +runscript $script +quit
+  rm $script
+}
+
+steamcli_cache() {
+  local cache_file="${CACHE_DIR}/$1"; shift
+  [ -f "${cache_file}" ] && cat "${cache_file}" && return
+  steamcli "$@" | grep -v '"@NoPromptForPassword" = "1"' | egrep '^\s*({|}|"|License packageID)' | fixutf8 | tee "${cache_file}"
+}
+
+steamcli_pkg_ids() {
+  steamcli_cache "licenses.out" +licenses_print | grep "License packageID" | awk '{gsub(":",""); print $3}'
+}
+
+steamcli_pkg_info() {
+  steamcli_cache "pkg-$1.vdf" +package_info_print "$1" | vdf2json
+}
+
+steamcli_pkg_infos() {
+  steamcli_cache "pkgs.vdf" $(printf '+package_info_print %s ' $(steamcli_pkg_ids)) | tee >(vdf2file "$CACHE_DIR" 'pkg-') | vdf2json
+}
+
+steamcli_app_ids() {
+  steamcli_pkg_infos | jq ".[].appids|.[]" -r
+}
+
+steamcli_app_info() {
+  steamcli_cache "app-$1.vdf" +app_info_print "$1" | vdf2json
+}
+
+steamcli_app_infos() {
+  steamcli_cache "apps.vdf" $(printf '+app_info_print %s ' $(steamcli_app_ids)) | tee >(vdf2file "$CACHE_DIR" 'app-') | vdf2json
+}
+
+steamcli_app_names() {
+  steamcli_app_infos | jq -cr '.[]|select(.common.type == "game" or .common.type == "Game").common.name' | sort
+}
+
+steamcli_app_folder() {
+  local app_id=$1
+  local platform=${2:-linux}
+  steamcli_app_info "$app_id" | jq -rc ".[]?.config|.installdir"
+}
+
+steamcli_app_command() {
+  local app_id=$1
+  local platform=${2:-linux}
+  steamcli_app_info "$app_id" | jq -rc ".[]?.config.launch|.[]?|select(.config.oslist == \"$platform\" and .config.betakey == null)|.executable + \" \" + .arguments"
+}
+
+steamcli_app_install() {
+  eval $(steamcli_options "steamcli_app_install" "$@")
+  if [ -z "$app_name" -a -z "$app_id" ]; then
+    steamcli_usage && return 1
+  elif [ -z "$app_id" ]; then
+    app_id=$(steamcli_app_infos | jq -rc ".[]|select(.common.name == \"$app_name\").common.gameid")
+  fi
+  local app_folder=$(steamcli_app_folder "$app_id" "$platform")
+
+  mkdir -p "$GAMES_DIR/$app_folder"
+  steamcli +force_install_dir "\"$GAMES_DIR/$app_folder\"" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
+}
+
+steamcli_app_execute() {
+  eval $(steamcli_options "steamcli_app_run" "$@")
+  if [ -z "$app_name" -a -z "$app_id" ]; then
+    steamcli_usage && return 1
+  elif [ -z "$app_id" ]; then
+    app_id=$(steamcli_app_infos | jq -rc ".[]|select(.common.name == \"$app_name\").common.gameid")
+  fi
+  if [ -z "$app_cmd" ]; then
+  	app_cmd=$(steamcli_app_command "$app_id" "$platform")
+  fi
+  local app_folder=$(steamcli_app_folder "$app_id" "$platform")
+
+  pushd "$GAMES_DIR/$app_folder"
+  case "$platform-$bitness" in
+    linux-*) "$STEAM_DIR/ubuntu12_32/steam-runtime/run.sh" ./$app_cmd;;
+    windows-64) WINEPREFIX="$(pwd)/.wine64" wine64 $app_cmd;;
+    windows-32) WINEPREFIX="$(pwd)/.wine32" wine32 $app_cmd;;
+  esac
+  popd
+}
+
+case "$1" in
+  install) steamcli_app_install "$@";;
+  execute) steamcli_app_execute "$@";;
+  list) steamcli_app_names "$@";;
+  *) steamcli_usage "$@";;
+esac
