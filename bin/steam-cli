@@ -163,7 +163,8 @@ steamcli_app_folder() {
 steamcli_app_command() {
   local app_id=$1
   local platform=${2:-linux}
-  steamcli_app_info "$app_id" | jq -rc ".[]?.config.launch|.[]?|select(.config.oslist == \"$platform\" and .config.betakey == null)|.executable + \" \" + .arguments"
+  local bitness=${3:-64}
+  steamcli_app_info "$app_id" | jq -rc ".[]?.config.launch|.[]?|select(.config.oslist == \"$platform\" and (.config.osarch == \"$bitness\" or .config.osarch == null) and .config.betakey == null)|.executable + \" \" + .arguments"
 }
 
 steamcli_app_install() {
@@ -190,7 +191,7 @@ steamcli_app_execute() {
     app_id=$(steamcli_app_infos | jq -rc ".[]|select(.common.name == \"$app_name\").common.gameid")
   fi
   if [ -z "$app_cmd" ]; then
-    app_cmd=$(steamcli_app_command "$app_id" "$platform")
+    app_cmd=$(steamcli_app_command "$app_id" "$platform" "$bitness")
   fi
   local app_folder=$(steamcli_app_folder "$app_id" "$platform")
 
