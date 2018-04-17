@@ -153,7 +153,7 @@ steamcli_pkg_info() {
 }
 
 steamcli_pkg_infos() {
-  steamcli_cache "pkgs.vdf" $(printf '+package_info_print %s ' $(steamcli_pkg_ids)) | tee >(vdf2file "$CACHE_DIR" 'pkg-') | vdf2json
+  steamcli_cache "pkgs.vdf" $(printf '+package_info_print %s ' $(steamcli_pkg_ids)) | vdf2json
 }
 
 steamcli_app_ids() {
@@ -165,7 +165,7 @@ steamcli_app_info() {
 }
 
 steamcli_app_infos() {
-  steamcli_cache "apps.vdf" $(printf '+app_info_print %s ' $(steamcli_app_ids)) | grep -v '^AppID :' | tee >(vdf2file "$CACHE_DIR" 'app-') | vdf2json
+  steamcli_cache "apps.vdf" $(printf '+app_info_print %s ' $(steamcli_app_ids)) | grep -v '^AppID :' | vdf2json
 }
 
 steamcli_app_names() {
