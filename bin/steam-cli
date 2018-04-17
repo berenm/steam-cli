@@ -1,6 +1,7 @@
 #!/bin/bash
 
 STEAM_CMD=$(which steamcmd)
+STEAM_DIR="$HOME/.steam"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/steam-cli"
 
 steamcli_usage() {
@@ -110,12 +111,26 @@ vdf2file() {
 }
 
 steamcli() {
-  local username=$(cat ~/.steam/registry.vdf | vdf2json | jq -r .[].HKCU.Software.Valve.Steam.AutoLoginUser)
+  local username
+  if [ -f "$STEAM_DIR/registry.vdf" ]; then
+    username=$(cat "$STEAM_DIR/registry.vdf" | vdf2json | jq -rc '.[].HKCU.Software.Valve.Steam.AutoLoginUser')
+  elif [ -f "$STEAM_DIR/config/config.vdf" ]; then
+    username=$(cat "$STEAM_DIR/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
+  elif [ -f "$STEAM_DIR/steam/config/config.vdf" ]; then
+    username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
+  fi
   $STEAM_CMD +@NoPromptForPassword 1 +login $username "$@" +quit
 }
 
 steamcli_login() {
-  local username=$(cat ~/.steam/registry.vdf | vdf2json | jq -r .[].HKCU.Software.Valve.Steam.AutoLoginUser)
+  local username
+  if [ -f "$STEAM_DIR/registry.vdf" ]; then
+    username=$(cat "$STEAM_DIR/registry.vdf" | vdf2json | jq -rc '.[].HKCU.Software.Valve.Steam.AutoLoginUser')
+  elif [ -f "$STEAM_DIR/config/config.vdf" ]; then
+    username=$(cat "$STEAM_DIR/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
+  elif [ -f "$STEAM_DIR/steam/config/config.vdf" ]; then
+    username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
+  fi
   echo -n "Password: (leave empty to use cached password) " && read -s password && echo
   $STEAM_CMD +@NoPromptForPassword 1 +login $username $password "$@" +quit
 }
