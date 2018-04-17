@@ -215,7 +215,8 @@ steamcli_update_cache() {
   echo "done"
 }
 
-case "$1" in
+command="$1"; shift
+case "$command" in
   install) steamcli_app_install "$@";;
   execute) steamcli_app_execute "$@";;
   list) steamcli_app_names "$@";;
