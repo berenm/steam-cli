@@ -161,7 +161,7 @@ steamcli_app_ids() {
 }
 
 steamcli_app_info() {
-  steamcli_cache "app-$1.vdf" +app_info_print "$1" | vdf2json
+  steamcli_cache "app-$1.vdf" +app_info_print "$1" | grep -v '^AppID :' | vdf2json
 }
 
 steamcli_app_infos() {
