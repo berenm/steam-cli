@@ -38,7 +38,7 @@ steamcli_options() {
   echo "local platform=linux"
   echo "local language=${LANG%_*}"
   echo "STEAM_DIR=$HOME/.steam"
-  echo "GAMES_DIR=$HOME/.steam/steam/steamapps/common"
+  echo "GAMES_DIR="
   case "$(uname -m)" in
     "x86_64") echo "local bitness=64";;
     *) echo "local bitness=32";;
@@ -195,8 +195,10 @@ steamcli_app_install() {
   local app_folder=$(steamcli_app_folder "$app_id" "$platform")
 
   local script=$(mktemp)
-  echo "force_install_dir \"$GAMES_DIR/$app_folder\"" > "$script"
-  mkdir -p "$GAMES_DIR/$app_folder"
+  if [ ! -z "$GAMES_DIR" ]; then
+    echo "force_install_dir \"$GAMES_DIR/$app_folder\"" > "$script"
+    mkdir -p "$GAMES_DIR/$app_folder"
+  fi
   steamcli +runscript "$script" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
   rm "$script"
 }
@@ -211,11 +213,11 @@ steamcli_app_execute() {
   if [ -z "$app_cmd" ]; then
     app_cmd=$(steamcli_app_command "$app_id" "$platform" "$bitness")
   fi
-  local app_folder=$(steamcli_app_folder "$app_id" "$platform")
+  local app_folder="${GAMES_DIR:-$STEAM_DIR/steam/steamapps/common}/$(steamcli_app_folder "$app_id" "$platform")"
 
-  [ ! -d "$GAMES_DIR/$app_folder" ] && echo "Couldn't find $GAMES_DIR/$app_folder, maybe the game isn't installed?" && return 1
+  [ ! -d "$app_folder" ] && echo "Couldn't find $app_folder, maybe the game isn't installed?" && return 1
 
-  pushd "$GAMES_DIR/$app_folder"
+  pushd "$app_folder"
   case "$platform-$bitness" in
     linux-*) "$STEAM_DIR/ubuntu12_32/steam-runtime/run.sh" ./$app_cmd;;
     windows-64) WINEPREFIX="$(pwd)/.wine64" wine64 $app_cmd;;
