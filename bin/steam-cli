@@ -221,5 +221,6 @@ case "$command" in
   execute) steamcli_app_execute "$@";;
   list) steamcli_app_names "$@";;
   update-cache) steamcli_update_cache "$@";;
+  --) "$@";;
   *) steamcli_usage "$@";;
 esac
