@@ -190,7 +190,7 @@ steamcli_app_execute() {
     app_id=$(steamcli_app_infos | jq -rc ".[]|select(.common.name == \"$app_name\").common.gameid")
   fi
   if [ -z "$app_cmd" ]; then
-  	app_cmd=$(steamcli_app_command "$app_id" "$platform")
+    app_cmd=$(steamcli_app_command "$app_id" "$platform")
   fi
   local app_folder=$(steamcli_app_folder "$app_id" "$platform")
 
