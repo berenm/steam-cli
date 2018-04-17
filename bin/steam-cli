@@ -122,8 +122,11 @@ steamcli_login() {
 
 steamcli_cache() {
   local cache_file="${CACHE_DIR}/$1"; shift
-  [ -f "${cache_file}" ] && cat "${cache_file}" && return
-  steamcli "$@" | grep -v '"@NoPromptForPassword" = "1"' | egrep '^\s*({|}|"|License packageID)' | fixutf8 | tee "${cache_file}"
+  if [ -f "${cache_file}" ]; then
+    cat "${cache_file}"
+  else
+    steamcli "$@" | sed -e '1,/Waiting for user info...OK/d' | fixutf8 | tee "${cache_file}"
+  fi
 }
 
 steamcli_pkg_ids() {
