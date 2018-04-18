@@ -50,6 +50,14 @@ USAGE
     -g, --games-dir     Directory where to find installed games
     -s, --steam-dir     Directory where to find steam [default: ~/.steam]
 
+``steam-cli`` should be able to start any game, but sadly many games check whether they
+were started from Steam, and if not, launch Steam and restart from there.
+
+This is also the case for windows games, running inside ``wine``, but there ``steam``
+executable will probably not be found and these games won't start at all.
+
+For a list of DRM-free games, see http://steam.wikia.com/wiki/List_of_DRM-free_games
+
 LICENSE
 -------------------------------------------------------------------------------
 
