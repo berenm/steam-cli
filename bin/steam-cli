@@ -141,6 +141,7 @@ steamcli_login() {
 
 steamcli_cache() {
   local cache_file="${CACHE_DIR}/$1"; shift
+  mkdir -p "${CACHE_DIR}"
   if [ -f "${cache_file}" ]; then
     cat "${cache_file}"
   else
