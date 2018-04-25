@@ -13,6 +13,7 @@ distribution:
 - ``bash``
 - ``steamcmd``
 - ``jq``
+- ``secret-tool`` (from libsecret-tools, for credential storage)
 - ``wine`` (optional)
 
 INSTALLATION
@@ -34,6 +35,7 @@ USAGE
                              [--games-dir=<directory>]
                              [--steam-dir=<directory>]
   Commands:
+    login               Login to steam and store credentials in keyring
     install             Download and install game
     execute             Execute installed game
     list                List all available games

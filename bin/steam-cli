@@ -13,6 +13,7 @@ Usage: steam-cli <command> (--id=<app-id>|--name=<app-name>)
                            [--games-dir=<directory>]
                            [--steam-dir=<directory>]
 Commands:
+  login               Login to steam and store credentials in keyring
   install             Download and install game
   execute             Execute installed game
   list                List all available games
@@ -126,16 +127,13 @@ steamcli() {
 
 steamcli_login() {
   local username
-  if [ -f "$STEAM_DIR/registry.vdf" ]; then
-    username=$(cat "$STEAM_DIR/registry.vdf" | vdf2json | jq -rc '.[].HKCU.Software.Valve.Steam | select(.AutoLoginUser) .AutoLoginUser')
+  echo -n "Username: " && read username && echo
+  local password=$(secret-tool lookup unique steam:$username)
+  if [ ! $? -eq 0 ]; then
+    secret-tool store --label "Steam password for $username" unique steam:$username
+    password=$(secret-tool lookup unique steam:$username)
   fi
-  if [ -z "$username" -a -f "$STEAM_DIR/config/config.vdf" ]; then
-    username=$(cat "$STEAM_DIR/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
-  fi
-  if [ -z "$username" -a -f "$STEAM_DIR/steam/config/config.vdf" ]; then
-    username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
-  fi
-  echo -n "Password: (leave empty to use cached password) " && read -s password && echo
+
   $STEAM_CMD +@NoPromptForPassword 1 +login $username $password "$@" +quit
 }
 
@@ -243,6 +241,7 @@ steamcli_update_cache() {
 
 command="$1"; shift
 case "$command" in
+  login) steamcli_login "$@";;
   install) steamcli_app_install "$@";;
   execute) steamcli_app_execute "$@";;
   list) steamcli_app_names "$@";;
