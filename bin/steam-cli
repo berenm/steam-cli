@@ -4,6 +4,11 @@ STEAM_CMD=$(which steamcmd)
 STEAM_DIR="$HOME/.steam"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/steam-cli"
 
+STEAM_CLI_GUI=text
+if [ ! -t 1 ]; then
+  STEAM_CLI_GUI=zenity
+fi
+
 steamcli_usage() {
   cat <<EOF
 Usage: steam-cli <command> (--id=<app-id>|--name=<app-name>)
@@ -31,6 +36,8 @@ Other arguments:
   -s, --steam-dir     Directory where to find steam [default: ~/.steam]
 
   --debug             Run in debug mode (mostly set -x)
+  --gui <gui>         Choose the GUI to use for progress indication from the
+                      list of supported GUIs: none, text, curses, system
 EOF
 }
 
@@ -48,7 +55,7 @@ steamcli_options() {
   esac
 
   command=$1; shift;
-  local params="$(getopt -o 'i:n:c:p:l:b:g:s:h' -l 'id:,name:,command:,platform:,language:,bitness:,games-dir:,steam-dir:,help,debug' -n "$command" -- "$@")"
+  local params="$(getopt -o 'i:n:c:p:l:b:g:s:h' -l 'id:,name:,command:,platform:,language:,bitness:,games-dir:,steam-dir:,help,debug,gui:' -n "$command" -- "$@")"
   [ $? -ne 0 ] && steamcli_usage && return 1
 
   eval set -- "$params"
@@ -97,10 +104,43 @@ steamcli_options() {
       -h|--help) shift;;
       --debug)
           echo "set -x;"; shift 1;;
+      --gui)
+          case "$2" in
+              none|text|curses|zenity) echo "STEAM_CLI_GUI=\"$2\";"; shift 2;;
+              *) shift 2;;
+          esac;;
       --) shift; break;;
       *) echo "Internal error!" >&2; exit 1;;
     esac
   done
+}
+
+progress_none() {
+  cat
+}
+
+progress_text() {
+  local prompt="Login..."
+  local progress=0
+  sed -ure '/progress: ([0-9]+)/!d; s@^.*(\b.+), progress: ([0-9]+).*$@# \u\1...\n\2@g' | \
+  while read line; do
+    [[ "$line" == "#"* ]] && prompt="${line#\# }" || progress="$line"
+    local length=$((80-$(echo -n "$prompt"|wc -c)))
+    printf "%s [%-*.*s]\r" "$prompt" $length $(($progress*$length/100)) $(printf "%0.1s" "#"{1..80});
+  done
+  printf '\n'
+}
+
+progress_curses() {
+  sed -ure '/progress: ([0-9]+)/!d; s@^.*(\b.+), progress: ([0-9]+).*$@XXX\n\2\n\u\1...\nXXX@g' | whiptail --gauge "Login..." 6 80 0
+}
+
+progress_zenity() {
+  sed -ure '/progress: ([0-9]+)/!d; s@^.*(\b.+), progress: ([0-9]+).*$@# \u\1...\n\2@g' | zenity --width 320 --progress --text "Login..." --auto-kill --auto-close --no-cancel --time-remaining
+}
+
+progress() {
+  progress_${STEAM_CLI_GUI:-none} "$@"
 }
 
 fixutf8() {
@@ -135,7 +175,7 @@ steamcli() {
     password=$(secret-tool lookup unique steam:$username)
   fi
 
-  $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
+  unbuffer $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
 }
 
 steamcli_login() {
@@ -147,7 +187,7 @@ steamcli_login() {
     password=$(secret-tool lookup unique steam:$username)
   fi
 
-  $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
+  unbuffer $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
 }
 
 steamcli_cache() {
@@ -215,7 +255,10 @@ steamcli_app_install() {
     echo "force_install_dir \"$GAMES_DIR/$app_folder\"" > "$script"
     mkdir -p "$GAMES_DIR/$app_folder"
   fi
-  steamcli +runscript "$script" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
+
+  ( echo "# login, progress: 50"
+    steamcli +runscript "$script" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
+    echo "# done, progress: 100") | progress
   rm "$script"
 }
 

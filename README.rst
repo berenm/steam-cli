@@ -13,6 +13,7 @@ distribution:
 - ``bash``
 - ``steamcmd``
 - ``jq``
+- ``unbuffer`` (from expect package, for progress report)
 - ``secret-tool`` (from libsecret-tools, for credential storage)
 - ``wine`` (optional)
 
@@ -53,6 +54,8 @@ USAGE
     -s, --steam-dir     Directory where to find steam [default: ~/.steam]
 
     --debug             Run in debug mode (mostly set -x)
+    --gui <gui>         Choose the GUI to use for progress indication from the
+                        list of supported GUIs: none, text, curses, system
 
 ``steam-cli`` should be able to start any game, but sadly many games check whether they
 were started from Steam, and if not, launch Steam and restart from there.
