@@ -41,11 +41,11 @@ USAGE
     list                List all available games
     update-cache        Update cached game list
 
-  Mandatory options:
+  Mandatory arguments:
     -i, --id            AppID of the game
     -n, --name          Name of the game
 
-  Other options:
+  Other arguments:
     -p, --platform      Platform to install
     -b, --bitness       Bitness of the platform
     -l, --language      Language of the game to install
