@@ -225,7 +225,10 @@ steamcli_app_execute() {
   if [ -z "$app_cmd" ]; then
     app_cmd=$(steamcli_app_command "$app_id" "$platform" "$bitness")
   fi
-  local app_folder="${GAMES_DIR:-$STEAM_DIR/steam/steamapps/common}/$(steamcli_app_folder "$app_id" "$platform")"
+
+  local games_dir="$STEAM_DIR/steam/steamapps/common"
+  [ ! -d "$games_dir" ] && games_dir="$STEAM_DIR/SteamApps/common"
+  local app_folder="${GAMES_DIR:-$games_dir}/$(steamcli_app_folder "$app_id" "$platform")"
 
   [ ! -d "$app_folder" ] && echo "Couldn't find $app_folder, maybe the game isn't installed?" && return 1
 
