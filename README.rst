@@ -52,6 +52,8 @@ USAGE
     -g, --games-dir     Directory where to find installed games
     -s, --steam-dir     Directory where to find steam [default: ~/.steam]
 
+    --debug             Run in debug mode (mostly set -x)
+
 ``steam-cli`` should be able to start any game, but sadly many games check whether they
 were started from Steam, and if not, launch Steam and restart from there.
 

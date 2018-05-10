@@ -29,24 +29,26 @@ Other arguments:
   -l, --language      Language of the game to install
   -g, --games-dir     Directory where to find installed games
   -s, --steam-dir     Directory where to find steam [default: ~/.steam]
+
+  --debug             Run in debug mode (mostly set -x)
 EOF
 }
 
 steamcli_options() {
-  echo "local app_id"
-  echo "local app_name"
-  echo "local app_cmd"
-  echo "local platform=linux"
-  echo "local language=${LANG%_*}"
-  echo "STEAM_DIR=$HOME/.steam"
-  echo "GAMES_DIR="
+  echo "local app_id;"
+  echo "local app_name;"
+  echo "local app_cmd;"
+  echo "local platform=linux;"
+  echo "local language=${LANG%_*};"
+  echo "STEAM_DIR=$HOME/.steam;"
+  echo "GAMES_DIR=;"
   case "$(uname -m)" in
-    "x86_64") echo "local bitness=64";;
-    *) echo "local bitness=32";;
+    "x86_64") echo "local bitness=64;";;
+    *) echo "local bitness=32;";;
   esac
 
   command=$1; shift;
-  local params="$(getopt -o 'i:n:c:p:l:b:g:s:h' -l 'id:,name:,command:,platform:,language:,bitness:,games-dir:,steam-dir:,help' -n "$command" -- "$@")"
+  local params="$(getopt -o 'i:n:c:p:l:b:g:s:h' -l 'id:,name:,command:,platform:,language:,bitness:,games-dir:,steam-dir:,help,debug' -n "$command" -- "$@")"
   [ $? -ne 0 ] && steamcli_usage && return 1
 
   eval set -- "$params"
@@ -55,46 +57,48 @@ steamcli_options() {
       -i|--id)
           case "$2" in
               "") shift 2;;
-              *) echo "local app_id=\"$2\""; shift 2;;
+              *) echo "local app_id=\"$2\";"; shift 2;;
           esac;;
       -n|--name)
           case "$2" in
               "") shift 2;;
-              *) echo "local app_name=\"$2\""; shift 2;;
+              *) echo "local app_name=\"$2\";"; shift 2;;
           esac;;
       -c|--command)
           case "$2" in
               "") shift 2;;
-              *) echo "local app_cmd=\"$2\""; shift 2;;
+              *) echo "local app_cmd=\"$2\";"; shift 2;;
           esac;;
       -p|--platform)
           case "$2" in
               "") shift 2;;
-              *) echo "platform=\"$2\""; shift 2;;
+              *) echo "platform=\"$2\";"; shift 2;;
           esac;;
       -l|--language)
           case "$2" in
               "") shift 2;;
-              *) echo "language=\"$2\""; shift 2;;
+              *) echo "language=\"$2\";"; shift 2;;
           esac;;
       -b|--bitness)
           case "$2" in
               "") shift 2;;
-              *) echo "bitness=\"$2\""; shift 2;;
+              *) echo "bitness=\"$2\";"; shift 2;;
           esac;;
       -g|--games-dir)
           case "$2" in
               "") shift 2;;
-              *) echo "GAMES_DIR=\"$2\""; shift 2;;
+              *) echo "GAMES_DIR=\"$2\";"; shift 2;;
           esac;;
       -s|--steam-dir)
           case "$2" in
               "") shift 2;;
-              *) echo "STEAM_DIR=\"$2\""; shift 2;;
+              *) echo "STEAM_DIR=\"$2\";"; shift 2;;
           esac;;
       -h|--help) shift;;
+      --debug)
+          echo "set -x;"; shift 1;;
       --) shift; break;;
-      *) echo "Internal error!"; exit 1;;
+      *) echo "Internal error!" >&2; exit 1;;
     esac
   done
 }
