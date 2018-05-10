@@ -122,7 +122,16 @@ steamcli() {
   if [ -z "$username" -a -f "$STEAM_DIR/steam/config/config.vdf" ]; then
     username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
   fi
-  $STEAM_CMD +@NoPromptForPassword 1 +login $username "$@" +quit
+  if [ -z "$username" ]; then
+    echo -n "Username: " && read username && echo
+  fi
+  local password=$(secret-tool lookup unique steam:$username)
+  if [ ! $? -eq 0 ]; then
+    secret-tool store --label "Steam password for $username" unique steam:$username
+    password=$(secret-tool lookup unique steam:$username)
+  fi
+
+  $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
 }
 
 steamcli_login() {
@@ -134,7 +143,7 @@ steamcli_login() {
     password=$(secret-tool lookup unique steam:$username)
   fi
 
-  $STEAM_CMD +@NoPromptForPassword 1 +login $username $password "$@" +quit
+  $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
 }
 
 steamcli_cache() {
