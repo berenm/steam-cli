@@ -109,7 +109,7 @@ steamcli_options() {
               none|text|curses|zenity) echo "STEAM_CLI_GUI=\"$2\";"; shift 2;;
               *) shift 2;;
           esac;;
-      --) shift; break;;
+      --) shift; echo "eval set -- "$@""; break;;
       *) echo "Internal error!" >&2; exit 1;;
     esac
   done
@@ -281,9 +281,9 @@ steamcli_app_execute() {
 
   pushd "$app_folder"
   case "$platform-$bitness" in
-    linux-*) "$STEAM_DIR/ubuntu12_32/steam-runtime/run.sh" ./$app_cmd;;
-    windows-64) WINEPREFIX="$(pwd)/.wine64" wine64 $app_cmd;;
-    windows-32) WINEPREFIX="$(pwd)/.wine32" wine $app_cmd;;
+    linux-*) "$STEAM_DIR/ubuntu12_32/steam-runtime/run.sh" ./$app_cmd "$@";;
+    windows-64) WINEPREFIX="$(pwd)/.wine64" wine64 $app_cmd "$@";;
+    windows-32) WINEPREFIX="$(pwd)/.wine32" wine $app_cmd "$@";;
   esac
   popd
 }
