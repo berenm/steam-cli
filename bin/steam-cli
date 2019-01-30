@@ -18,7 +18,8 @@ Usage: steam-cli <command> (--id=<app-id>|--name=<app-name>)
                            [--games-dir=<directory>]
                            [--steam-dir=<directory>]
 Commands:
-  login               Login to steam and store credentials in keyring
+  login [auth-token]  Login to steam and store credentials in keyring
+                       (try login first without auth-token to trigger the email)
   install             Download and install game
   execute             Execute installed game
   list                List all available games
@@ -109,7 +110,7 @@ steamcli_options() {
               none|text|curses|zenity) echo "STEAM_CLI_GUI=\"$2\";"; shift 2;;
               *) shift 2;;
           esac;;
-      --) shift; echo "eval set -- "$@""; break;;
+      --) shift; echo "eval set -- "$command" "$@""; break;;
       *) echo "Internal error!" >&2; exit 1;;
     esac
   done
@@ -155,7 +156,7 @@ vdf2file() {
   mkdir -p "$1" && awk -v "dst=$1/$2" '/^"[^"]*"$/ { f=$1; gsub(/"/, "", f); printf("") > dst f ".vdf"} { print $0 >> dst f ".vdf" }'
 }
 
-steamcli() {
+steamcli_steamcmd() {
   local username
   if [ -f "$STEAM_DIR/registry.vdf" ]; then
     username=$(cat "$STEAM_DIR/registry.vdf" | vdf2json | jq -rc '.[].HKCU.Software.Valve.Steam | select(.AutoLoginUser) .AutoLoginUser')
@@ -167,7 +168,7 @@ steamcli() {
     username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
   fi
   if [ -z "$username" ]; then
-    echo -n "Username: " && read username && echo
+    echo >&2 "Please login in using 'steamcli login' command" && exit 1
   fi
   local password=$(secret-tool lookup unique steam:$username)
   if [ ! $? -eq 0 ]; then
@@ -187,7 +188,7 @@ steamcli_login() {
     password=$(secret-tool lookup unique steam:$username)
   fi
 
-  unbuffer $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
+  unbuffer -p $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
 }
 
 steamcli_cache() {
@@ -196,7 +197,7 @@ steamcli_cache() {
   if [ -f "${cache_file}" ]; then
     cat "${cache_file}"
   else
-    steamcli "$@" | sed -e '1,/Waiting for user info...OK/d' | fixutf8 | tee "${cache_file}"
+    steamcli_steamcmd "$@" | sed -e '1,/Waiting for user info...OK/d' | fixutf8 | tee "${cache_file}"
   fi
 }
 
@@ -242,7 +243,6 @@ steamcli_app_command() {
 }
 
 steamcli_app_install() {
-  eval $(steamcli_options "steamcli_app_install" "$@")
   if [ -z "$app_name" -a -z "$app_id" ]; then
     steamcli_usage && return 1
   elif [ -z "$app_id" ]; then
@@ -257,7 +257,7 @@ steamcli_app_install() {
   fi
 
   ( echo "# login, progress: 50"
-    steamcli +runscript "$script" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
+    steamcli_steamcmd +runscript "$script" +@sSteamCmdForcePlatformType "$platform" +@sSteamCmdForcePlatformBitness "$bitness" +app_update "$app_id" -validate -language "$language"
     echo "# done, progress: 100") | progress
   rm "$script"
 }
@@ -275,7 +275,6 @@ EOF
 }
 
 steamcli_app_execute() {
-  eval $(steamcli_options "steamcli_app_run" "$@")
   if [ -z "$app_name" -a -z "$app_id" ]; then
     steamcli_usage && return 1
   elif [ -z "$app_id" ]; then
@@ -316,13 +315,19 @@ steamcli_update_cache() {
   echo "done"
 }
 
-command="$1"; shift
-case "$command" in
-  login) steamcli_login "$@";;
-  install) steamcli_app_install "$@";;
-  execute) steamcli_app_execute "$@";;
-  list) steamcli_app_names "$@";;
-  update-cache) steamcli_update_cache "$@";;
-  --) "$@";;
-  *) steamcli_usage "$@";;
-esac
+steamcli() {
+  eval $(steamcli_options "$@")
+
+  command="$1"; shift
+  case "$command" in
+    login) steamcli_login "$@";;
+    install) steamcli_app_install "$@";;
+    execute) steamcli_app_execute "$@";;
+    list) steamcli_app_names "$@";;
+    update-cache) steamcli_update_cache "$@";;
+    --) "$@";;
+    *) steamcli_usage "$@";;
+  esac
+}
+
+steamcli "$@"
