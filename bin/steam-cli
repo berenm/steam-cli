@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 STEAM_CMD=$(which steamcmd)
 STEAM_DIR="$HOME/.steam"
@@ -156,20 +156,72 @@ vdf2file() {
   mkdir -p "$1" && awk -v "dst=$1/$2" '/^"[^"]*"$/ { f=$1; gsub(/"/, "", f); printf("") > dst f ".vdf"} { print $0 >> dst f ".vdf" }'
 }
 
-steamcli_steamcmd() {
-  local username
-  if [ -f "$STEAM_DIR/registry.vdf" ]; then
-    username=$(cat "$STEAM_DIR/registry.vdf" | vdf2json | jq -rc '.[].HKCU.Software.Valve.Steam | select(.AutoLoginUser) .AutoLoginUser')
-  fi
+steamcli_exp() {
+  local username="$1"
   if [ -z "$username" -a -f "$STEAM_DIR/config/config.vdf" ]; then
-    username=$(cat "$STEAM_DIR/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
+    username=$(cat "$STEAM_DIR/config/config.vdf" | vdf2json | jq -rc "try .InstallConfigStore.Software.Valve.Steam.Accounts catch [] | keys[0]")
   fi
   if [ -z "$username" -a -f "$STEAM_DIR/steam/config/config.vdf" ]; then
-    username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc ".InstallConfigStore.Software.Valve.Steam.Accounts | keys[0]")
+    username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc "try .InstallConfigStore.Software.Valve.Steam.Accounts catch [] | keys[0]")
   fi
   if [ -z "$username" ]; then
-    echo >&2 "Please login in using 'steamcli login' command" && exit 1
+    echo -n "Username: " && read username && echo
   fi
+
+  local password=$(secret-tool lookup unique steam:$username)
+  if [ ! $? -eq 0 ]; then
+    secret-tool store --label "Steam password for $username" unique steam:$username
+    password=$(secret-tool lookup unique steam:$username)
+  fi
+
+  expect -f ./steamcmd.exp "$username" "$password"
+}
+
+steamcli_login() {
+  ( echo "# initializing, progress: 0"
+    unbuffer $STEAM_CMD +quit | sed -ure '/\[100%\]/d; s/\[\s*([0-9]+)%] (\b\w+).*$/# \2, progress: \1/; s/\[----] (\b\w+).*$/# \1, progress: 0/'
+    echo "# done, progress: 100") | progress
+
+  local username="$1"
+  if [ -z "$username" -a -f "$STEAM_DIR/config/config.vdf" ]; then
+    username=$(cat "$STEAM_DIR/config/config.vdf" | vdf2json | jq -rc "try .InstallConfigStore.Software.Valve.Steam.Accounts catch [] | keys[0]")
+  fi
+  if [ -z "$username" -a -f "$STEAM_DIR/steam/config/config.vdf" ]; then
+    username=$(cat "$STEAM_DIR/steam/config/config.vdf" | vdf2json | jq -rc "try .InstallConfigStore.Software.Valve.Steam.Accounts catch [] | keys[0]")
+  fi
+  if [ -z "$username" ]; then
+    echo -n "Username: " && read username && echo
+  fi
+
+  local password=$(secret-tool lookup unique steam:$username)
+  if [ ! $? -eq 0 ]; then
+    secret-tool store --label "Steam password for $username" unique steam:$username
+    password=$(secret-tool lookup unique steam:$username)
+  fi
+
+  unbuffer -p $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit | tee >(cat >&2) | \
+    grep --quiet "This computer has not been authenticated for your account using Steam Guard." -m 1 || exit 0
+
+  local authtoken
+  echo -n "Token: " && read authtoken && echo
+  unbuffer -p $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$authtoken" +quit || exit 1
+}
+
+steamcli_username() {
+  local username
+
+  while [ -z "$username" ];
+  do
+    if [ -f "$STEAM_DIR/registry.vdf" ]; then
+      username=$(cat "$STEAM_DIR/registry.vdf" | vdf2json | jq -rc '.[].HKCU.Software.Valve.Steam | select(.AutoLoginUser) .AutoLoginUser')
+    fi
+  done
+
+  echo "$username"
+}
+
+steamcli_steamcmd() {
+  local username=$(steamcli_username)
   local password=$(secret-tool lookup unique steam:$username)
   if [ ! $? -eq 0 ]; then
     secret-tool store --label "Steam password for $username" unique steam:$username
@@ -179,19 +231,7 @@ steamcli_steamcmd() {
   unbuffer $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
 }
 
-steamcli_login() {
-  local username
-  echo -n "Username: " && read username && echo
-  local password=$(secret-tool lookup unique steam:$username)
-  if [ ! $? -eq 0 ]; then
-    secret-tool store --label "Steam password for $username" unique steam:$username
-    password=$(secret-tool lookup unique steam:$username)
-  fi
-
-  unbuffer -p $STEAM_CMD +@NoPromptForPassword 1 +login "$username" "$password" "$@" +quit
-}
-
-steamcli_cache() {
+steamcli_update_cache() {
   local cache_file="${CACHE_DIR}/$1"; shift
   mkdir -p "${CACHE_DIR}"
   if [ -f "${cache_file}" ]; then
@@ -317,6 +357,10 @@ steamcli_update_cache() {
 
 steamcli() {
   eval $(steamcli_options "$@")
+  steamcli_exp
+  exit 0
+  # steamcli_login || exit 1
+  # steamcli_username 1>/dev/null || exit 1
 
   command="$1"; shift
   case "$command" in
