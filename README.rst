@@ -1,7 +1,7 @@
 steam-cli: better command-line interface for Steam
 ================================================================================
 
-Bash script that allows you to interact with steam directly from the command
+Python script that allows you to interact with steam directly from the command
 line, in a better way than using steamcmd.
 
 DEPENDENCIES
@@ -10,19 +10,16 @@ DEPENDENCIES
 steam-cli relies on the following tools, that should be available on your
 distribution:
 
-- ``bash``
-- ``steamcmd``
-- ``jq``
-- ``unbuffer`` (from expect package, for progress report)
+- ``python``
 - ``secret-tool`` (from libsecret-tools, for credential storage)
 - ``wine`` (optional)
 
 INSTALLATION
 --------------------------------------------------------------------------------
 
-Simply download steam-cli somewhere in your path.
+Install steam-cli with pip:
 
-You can always get the latest version of the script from https://git.io/steam-cli
+``pip install git+https://github.com/berenm/steam-cli@python``
 
 USAGE
 --------------------------------------------------------------------------------

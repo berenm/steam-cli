@@ -1,0 +1,8 @@
+[packages]
+pexpect = "*"
+vdf = "*"
+xdg = "*"
+docopt = "*"
+requests = "*"
+python-dateutil = "*"
+aiohttp = "*"
