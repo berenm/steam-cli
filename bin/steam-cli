@@ -152,7 +152,7 @@ vdf2json() {
 }
 
 vdf2file() {
-  mkdir -p "$1" && awk -v "dst=$1/$2" '/^"[^"]*"$/ { f=$1; gsub(/"/, "", f); printf("") > dst f ".vdf"} { print $0 >> dst f ".vdf" }'
+  mkdir -p "$1" && awk -v "dst=$1/$2" '/^"[^"]*"$/ { f=$1; gsub(/"/, "", f); printf("") > dst f ".vdf"} { print $0 >> dst f ".vdf" }' | tr -d "'"
 }
 
 steamcli() {
@@ -196,7 +196,12 @@ steamcli_cache() {
   if [ -f "${cache_file}" ]; then
     cat "${cache_file}"
   else
-    steamcli "$@" | sed -e '1,/Waiting for user info...OK/d' | fixutf8 | tee "${cache_file}"
+    if locale charmap | grep -q 'UTF-8'; then
+      steamcli "$@" | sed -e '1,/Waiting for user info...OK/d' | tee "${cache_file}"
+    else
+      steamcli "$@" | sed -e '1,/Waiting for user info...OK/d' | fixutf8 | tee "${cache_file}"
+    fi
+    
   fi
 }
 
