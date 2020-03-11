@@ -406,6 +406,7 @@ class SteamClient:
   def update_cache(self):
     shutil.rmtree(CACHE_DIR)
     os.makedirs(CACHE_DIR)
+    self.pkgs
     self.apps
 
   def id(self, **kwargs):
