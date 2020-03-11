@@ -266,7 +266,7 @@ class SteamClient:
           s.flush()
 
           self.steam.sendline('runscript "{}"'.format(s.name))
-          self.expect([r'"(\d+)"\r\n{\r\n(.*)\r\n}\r\n'],
+          self.expect([r'"(\d+)"\r\n{(.*)\r\n}\r\n'],
                       [lambda i, s: self.on_pkg(int(i), s)])
 
         with open(pkgs_cache, 'w') as f:
@@ -310,7 +310,7 @@ class SteamClient:
           s.flush()
 
           self.steam.sendline('runscript "{}"'.format(s.name))
-          self.expect([r'AppID :.*\r\n"(\d+)"\r\n{\r\n(.*)\r\n}\r\n'],
+          self.expect([r'AppID :.*\r\n"(\d+)"\r\n{(.*)\r\n}\r\n'],
                       [lambda i, s: self.on_app(int(i), s)])
 
         self._apps = dict([(k,v) for k,v in self._apps.items()
