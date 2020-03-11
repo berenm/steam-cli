@@ -313,6 +313,8 @@ class SteamClient:
           self.expect([r'AppID :.*\r\n"(\d+)"\r\n{\r\n(.*)\r\n}\r\n'],
                       [lambda i, s: self.on_app(int(i), s)])
 
+        self._apps = dict([(k,v) for k,v in self._apps.items()
+                           if 'common' in v])
         with open(apps_cache, 'w') as f:
           json.dump(self._apps, f)
 
