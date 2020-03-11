@@ -68,7 +68,7 @@ def progress(ui):
   def message(fmt, pct, txt):
     nonlocal _txt
     _txt = txt if txt else _txt
-    pct = 100 if pct is None else min(pct, 99)
+    pct = 100 if pct is None else min(int(pct), 99)
     bar = '#' * int(pct / 2) + ' ' * int(50 - (pct + 1) / 2)
     return fmt.format(pct=pct, txt=_txt, bar=bar)
 
