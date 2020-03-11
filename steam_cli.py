@@ -220,11 +220,13 @@ class SteamClient:
 
       self.steam.sendline('login {}'.format(username))
       self.progress(0, 'Login')
-      self.expect([r'password:', r'Two-factor code:', r'Logged in OK\r\n',
+      self.expect([r'password:', r"Steam Guard code:", r'Two-factor code:',
+                   r'Logged in OK\r\n',
                    r'FAILED login with result code ([^\n]+)\r\n',
                    r"Logging in user '.*' to Steam Public \.\.\.\r\n",
                    r"Waiting for user info\.\.\.OK\r\n"],
                   [lambda: self.steam.sendline(getpass.getpass('Password: ')),
+                   lambda: self.steam.sendline(input('Email code: ')),
                    lambda: self.steam.sendline(input('Two-factor code: ')),
                    lambda: self.on_login(), lambda e: self.on_error(e),
                    lambda: self.progress(50), lambda: self.progress(90)])
