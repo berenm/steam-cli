@@ -210,10 +210,12 @@ class SteamClient:
     self.progress(None)
 
   def expect(self, patterns, callbacks):
-      i = self.steam.expect([*patterns, r'Steam>'])
+      compiled = self.steam.compile_pattern_list([*patterns,
+                                                  '\x1b\[1m\r\nSteam>\x1b\[0m'])
+      i = self.steam.expect_list(compiled)
       while i < len(patterns):
         callbacks[i](*self.steam.match.groups())
-        i = self.steam.expect([*patterns, r'Steam>'])
+        i = self.steam.expect_list(compiled)
 
   @property
   def steam(self):
@@ -224,6 +226,10 @@ class SteamClient:
                   [lambda pct, txt: self.progress(int('0' + trydecode(pct).strip(' %-')), 'Updating')])
 
     return self._steam
+
+  def quit(self):
+    if self._steam:
+      self._steam.sendline('quit');
 
   def on_login(self):
     self.logged_on = True
@@ -544,6 +550,8 @@ def main():
       client.update_cache()
     else:
       print(args)
+
+    client.quit()
 
 
 if __name__ == '__main__':
