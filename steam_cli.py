@@ -37,6 +37,7 @@ Options:
 """
 
 import os
+import re
 import sys
 import json
 import getpass
@@ -167,6 +168,44 @@ class SteamClient:
     self._apps = None
     self.progress = progress
 
+  def load_cache(self):
+    if self._pkgs and self._pkgids and \
+       self._apps and self._appids:
+      return
+
+    pkgs_cache = os.path.join(CACHE_DIR, 'pkgs.json')
+    if os.path.exists(pkgs_cache):
+      with open(pkgs_cache, 'r') as f:
+        self._pkgs = dict(sorted([(int(k), v) for k,v in json.load(f).items()]))
+        self._pkgids = list(self._pkgs.keys())
+
+    apps_cache = os.path.join(CACHE_DIR, 'apps.json')
+    if os.path.exists(apps_cache):
+      with open(apps_cache, 'r') as f:
+        self._apps = dict(sorted([(int(k), v) for k,v in json.load(f).items()]))
+        self._appids = list(self._apps.keys())
+
+  def save_cache(self):
+    pkgs_cache = os.path.join(CACHE_DIR, 'pkgs.json')
+    if self._pkgs:
+      with open(pkgs_cache, 'w') as f:
+        json.dump(self._pkgs, f)
+
+    apps_cache = os.path.join(CACHE_DIR, 'apps.json')
+    if self._apps:
+      with open(apps_cache, 'w') as f:
+        json.dump(self._apps, f)
+
+  def update_cache(self):
+    shutil.rmtree(CACHE_DIR)
+    os.makedirs(CACHE_DIR)
+    self._pkgs = None
+    self._pkgids = None
+    self._apps = None
+    self._appids = None
+    self.pkgs
+    self.apps
+
   def close_progress(self):
     self.progress(None)
 
@@ -190,22 +229,8 @@ class SteamClient:
     self.logged_on = True
 
   def on_error(self, error):
-    raise error
-
-  def on_pkgid(self, i):
-    self._pkgids += [i]
-
-  def on_pkg(self, i, s):
-    with open(os.path.join(CACHE_DIR, 'pkg-{}.vdf'.format(i)), 'wb') as f:
-      f.write(s)
-    self._pkgs[i] = vdf.loads(trydecode(s))
-    self.progress(100 * len(self._pkgs) / len(self._pkgids))
-
-  def on_app(self, i, s):
-    with open(os.path.join(CACHE_DIR, 'app-{}.vdf'.format(i)), 'wb') as f:
-      f.write(s)
-    self._apps[i] = vdf.loads(trydecode(s))
-    self.progress(100 * len(self._apps) / len(self._appids))
+    print(error)
+    raise Exception()
 
   def login(self):
     while not self.logged_on:
@@ -231,8 +256,12 @@ class SteamClient:
                    lambda: self.on_login(), lambda e: self.on_error(e),
                    lambda: self.progress(50), lambda: self.progress(90)])
 
+  def on_pkgid(self, i):
+    self._pkgids += [i]
+
   @property
   def pkgids(self):
+    self.load_cache()
     if not self._pkgids:
       self._pkgids = []
       self.login()
@@ -241,91 +270,95 @@ class SteamClient:
       self.expect([r'License packageID (\d+):\r\n'],
                   [lambda i: self.on_pkgid(int(i))])
 
-      self._pkgids = list(set(self._pkgids))
+      self._pkgids = sorted(list(set(self._pkgids)))
+      self.save_cache()
 
     return self._pkgids
 
+  def on_pkg(self, i, s):
+    with open(os.path.join(CACHE_DIR, 'pkg-{}.vdf'.format(i)), 'wb') as f:
+      f.write(s)
+    self._pkgs[i] = vdf.loads(trydecode(s))
+    self.progress(100 * len(self._pkgs) / len(self._pkgids))
+
   @property
   def pkgs(self):
+    self.load_cache()
     if not self._pkgs:
-      pkgs_cache = os.path.join(CACHE_DIR, 'pkgs.json')
+      self._pkgs = {}
+      self.login()
+      self.progress(0, 'Loading pkgs')
 
-      if os.path.exists(pkgs_cache):
-        with open(pkgs_cache, 'r') as f:
-          self._pkgs = json.load(f)
-      else:
-        self._pkgs = {}
-        self.login()
-        self.progress(0, 'Loading pkgs')
+      with tempfile.NamedTemporaryFile(mode='w+') as s:
+        for i in self.pkgids:
+          cache = os.path.join(CACHE_DIR, 'pkg-{}.vdf'.format(i))
+          if os.path.exists(cache):
+            self.on_pkg(i, open(cache, 'rb').read())
+            continue
+          print('package_info_print {}'.format(i), file=s)
+        s.flush()
 
-        with tempfile.NamedTemporaryFile(mode='w+') as s:
-          for i in self.pkgids:
-            cache = os.path.join(CACHE_DIR, 'pkg-{}.vdf'.format(i))
-            if os.path.exists(cache):
-              self.on_pkg(i, open(cache, 'rb').read())
-              continue
-            print('package_info_print {}'.format(i), file=s)
-          s.flush()
+        self.steam.sendline('runscript "{}"'.format(s.name))
+        self.expect([r'"(\d+)"\r\n{\r\n((?:[^\n]*\r\n)*?)}\r\n'],
+                    [lambda i, s: self.on_pkg(int(i), s)])
 
-          self.steam.sendline('runscript "{}"'.format(s.name))
-          self.expect([r'"(\d+)"\r\n{(.*)\r\n}\r\n'],
-                      [lambda i, s: self.on_pkg(int(i), s)])
-
-        with open(pkgs_cache, 'w') as f:
-          json.dump(self._pkgs, f)
+      self._pkgs = dict(sorted(self._pkgs.items()))
+      self.save_cache()
 
     return self._pkgs
 
   @property
   def appids(self):
+    self.load_cache()
     if not self._appids:
       self._appids = []
-      self.login()
 
       for p in self.pkgs.values():
-        self._appids += list(p['appids'].values())
+        self._appids += list([int(i) for i in p['appids'].values()])
 
       self._appids = list(set(self._appids))
+      self.save_cache()
 
     return self._appids
 
+  def on_app(self, i, s):
+    with open(os.path.join(CACHE_DIR, 'app-{}.vdf'.format(i)), 'wb') as f:
+      f.write(s)
+    self._apps[i] = vdf.loads(trydecode(s))
+    self.progress(100 * len(self._apps) / len(self._appids))
+
   @property
   def apps(self):
+    self.load_cache()
     if not self._apps:
-      apps_cache = os.path.join(CACHE_DIR, 'apps.json')
+      self._apps = {}
+      self.login()
+      self.progress(0, 'Loading apps')
 
-      if os.path.exists(apps_cache):
-        with open(apps_cache, 'r') as f:
-          self._apps = json.load(f)
-      else:
-        self._apps = {}
-        self.login()
-        self.progress(0, 'Loading apps')
+      with tempfile.NamedTemporaryFile(mode='w+') as s:
+        for i in self.appids:
+          cache = os.path.join(CACHE_DIR, 'app-{}.vdf'.format(i))
+          if os.path.exists(cache):
+            self.on_app(i, open(cache, 'rb').read())
+            continue
+          print('app_info_print {}'.format(i), file=s)
+        s.flush()
 
-        with tempfile.NamedTemporaryFile(mode='w+') as s:
-          for i in self.appids:
-            cache = os.path.join(CACHE_DIR, 'app-{}.vdf'.format(i))
-            if os.path.exists(cache):
-              self.on_app(i, open(cache, 'rb').read())
-              continue
-            print('app_info_print {}'.format(i), file=s)
-          s.flush()
+        self.steam.sendline('runscript "{}"'.format(s.name))
+        self.expect([r'"(\d+)"\r\n{\r\n((?:[^\n]*\r\n)*?)}\r\n'],
+                    [lambda i, s: self.on_app(int(i), s)])
 
-          self.steam.sendline('runscript "{}"'.format(s.name))
-          self.expect([r'AppID :.*\r\n"(\d+)"\r\n{(.*)\r\n}\r\n'],
-                      [lambda i, s: self.on_app(int(i), s)])
+      self._apps = dict(sorted(self._apps.items()))
+      self.save_cache()
 
-        self._apps = dict([(k,v) for k,v in self._apps.items()
-                           if 'common' in v])
-        with open(apps_cache, 'w') as f:
-          json.dump(self._apps, f)
-
-      self._apps = dict(sorted(self._apps.items(),
-                               key=lambda i: i[1]['common']['name'].lower()))
     return self._apps
 
   def apps_by_type(self, t):
     for k,v in self.apps.items():
+      if not 'common' in v:
+        continue
+      if 'driverversion' in v['common']:
+        continue
       if v['common']['type'].lower() == t:
         yield k,v
 
@@ -405,12 +438,6 @@ class SteamClient:
       await asyncio.gather(*(self._download_covers(s, i, k, v)
                              for i,(k,v) in enumerate(self.games.items())))
 
-  def update_cache(self):
-    shutil.rmtree(CACHE_DIR)
-    os.makedirs(CACHE_DIR)
-    self.pkgs
-    self.apps
-
   def id(self, **kwargs):
     if kwargs.get('id', None) and kwargs['id'] in self.apps:
       return kwargs['id']
@@ -423,7 +450,7 @@ class SteamClient:
     raise GameNotFoundError
 
   def list(self):
-    for a in self.games.values():
+    for a in sorted(self.games.values(), key=lambda g: g['common']['name']):
       print(a['common']['name'])
 
   def show(self, **kwargs):
@@ -494,6 +521,9 @@ def main():
   args = docopt.docopt(__doc__, version='steam-cli v1.0.0')
   args = dict(((k if '--' not in k else k.strip('-').replace('-', '_'),v)
                for k,v in args.items()))
+
+  STEAM_DIR = os.path.expanduser(args['steam_dir'])
+  GAMES_DIR = os.path.expanduser(args['games_dir'])
 
   with progress(args['gui']) as p:
     client = SteamClient(progress=p, **args)
