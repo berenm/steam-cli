@@ -64,14 +64,22 @@ if not os.path.exists(CACHE_DIR):
 @contextlib.contextmanager
 def progress(ui):
   _txt = '...'
+  _pct = 0
   _cmd = None
 
   def message(fmt, pct, txt):
     nonlocal _txt
-    _txt = txt if txt else _txt
-    pct = 100 if pct is None else min(int(pct), 99)
-    bar = '#' * int(pct / 2) + ' ' * int(50 - (pct + 1) / 2)
-    return fmt.format(pct=pct, txt=_txt, bar=bar)
+    nonlocal _pct
+    if txt:
+      _txt = txt
+    if pct is None:
+      _pct = 100
+    elif pct >= 0:
+      _pct = min(pct, 99)
+    else:
+      _pct += -pct
+    bar = '#' * int(_pct / 2) + ' ' * int(50 - (_pct + 1) / 2)
+    return fmt.format(pct=int(_pct), txt=_txt, bar=bar)
 
   try:
     if ui == 'text':
@@ -387,7 +395,7 @@ class SteamClient:
   def demos(self):
     return dict(self.apps_by_type('demo'))
 
-  async def _download_covers(self, s, i, k, v, sem):
+  async def _download_covers(self, s, i, k, v, sem, pct):
     SOURCE = 'https://steamcdn-a.akamaihd.net/steam{}/apps/{}/{}.{}'
     TARGET = os.path.join(CACHE_DIR, '{}/{}.{}')
 
@@ -431,19 +439,18 @@ class SteamClient:
           await execute('convert {} \\( -clone {} \\) -delete 0--2 {}'
                         .format(ico, n.strip(), png))
 
-    self._pct += 100. / len(self.games)
-    self.progress(self._pct)
+    self.progress(-pct)
 
   async def download_covers(self):
     import aiohttp
 
-    self._pct = 0
     self.progress(0, 'Downloading')
 
     connector = aiohttp.TCPConnector(limit=16)
     sem = asyncio.Semaphore(16)
+    pct = 100. / len(self.games)
     async with aiohttp.ClientSession(connector=connector) as s:
-      await asyncio.gather(*(self._download_covers(s, i, k, v, sem)
+      await asyncio.gather(*(self._download_covers(s, i, k, v, sem, pct)
                              for i,(k,v) in enumerate(self.games.items())))
 
   def id(self, **kwargs):
