@@ -387,7 +387,7 @@ class SteamClient:
   def demos(self):
     return dict(self.apps_by_type('demo'))
 
-  async def _download_covers(self, s, i, k, v):
+  async def _download_covers(self, s, i, k, v, sem):
     SOURCE = 'https://steamcdn-a.akamaihd.net/steam{}/apps/{}/{}.{}'
     TARGET = os.path.join(CACHE_DIR, '{}/{}.{}')
 
@@ -420,15 +420,16 @@ class SteamClient:
       await download(s, SOURCE.format('community/public/images', k, n, 'ico'),
                      ico)
 
-    if 'clienticon' in v['common']:
-      if os.path.exists(ico) and not os.path.exists(png):
-        _, n, _ = await execute("identify -quiet -format '%p %h %w %z %k\\n' "
-                                "'{}' | sort -n -r -k2 -k3 -k4 -k5 | head -n1 "
-                                "| awk '{{print $1}}'".format(ico),
-                                stdout=subprocess.PIPE)
+    async with sem:
+      if 'clienticon' in v['common']:
+        if os.path.exists(ico) and not os.path.exists(png):
+          _, n, _ = await execute("identify -quiet -format '%p %h %w %z %k\\n' "
+                                  "'{}' | sort -n -r -k2 -k3 -k4 -k5 | head -n1 "
+                                  "| awk '{{print $1}}'".format(ico),
+                                  stdout=subprocess.PIPE)
 
-        await execute('convert {} \\( -clone {} \\) -delete 0--2 {}'
-                      .format(ico, n.strip(), png))
+          await execute('convert {} \\( -clone {} \\) -delete 0--2 {}'
+                        .format(ico, n.strip(), png))
 
     self._pct += 100. / len(self.games)
     self.progress(self._pct)
@@ -440,8 +441,9 @@ class SteamClient:
     self.progress(0, 'Downloading')
 
     connector = aiohttp.TCPConnector(limit=16)
+    sem = asyncio.Semaphore(16)
     async with aiohttp.ClientSession(connector=connector) as s:
-      await asyncio.gather(*(self._download_covers(s, i, k, v)
+      await asyncio.gather(*(self._download_covers(s, i, k, v, sem)
                              for i,(k,v) in enumerate(self.games.items())))
 
   def id(self, **kwargs):
