@@ -227,6 +227,21 @@ class SteamClient:
         callbacks[i](*self.steam.match.groups())
         i = self.steam.expect_list(compiled)
 
+  def steam_file(self, path):
+      file = os.path.join(STEAM_DIR, 'steam', path)
+      if os.path.exists(file):
+        return file
+
+      file = os.path.join(STEAM_DIR, 'root', path)
+      if os.path.exists(file):
+        return file
+
+      file = os.path.join(STEAM_DIR, 'debian-installation', path)
+      if os.path.exists(file):
+        return file
+
+      os.path.join(STEAM_DIR, path)
+
   @property
   def steam(self):
     if not self._steam:
@@ -250,9 +265,7 @@ class SteamClient:
 
   def login(self):
     while not self.logged_on:
-      cfg = os.path.join(STEAM_DIR, 'config/config.vdf')
-      if not os.path.exists(cfg):
-        cfg = os.path.join(STEAM_DIR, 'steam/config/config.vdf')
+      cfg = self.steam_file('config/config.vdf')
       if os.path.exists(cfg):
         with open(cfg) as f:
           username = list(vdf.parse(f)['InstallConfigStore']['Software']['Valve']['Steam']['Accounts'].keys())[0]
@@ -403,7 +416,7 @@ class SteamClient:
       import leveldb
 
       shutil.rmtree(os.path.join(CACHE_DIR, 'leveldb'))
-      shutil.copytree(os.path.join(STEAM_DIR, 'steam/config/htmlcache/Local Storage/leveldb'),
+      shutil.copytree(self.steam_file('config/htmlcache/Local Storage/leveldb'),
                       os.path.join(CACHE_DIR, 'leveldb'))
       db = leveldb.LevelDB(os.path.join(CACHE_DIR, 'leveldb'))
 
