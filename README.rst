@@ -26,29 +26,37 @@ USAGE
 
 ::
 
-  Usage: steam-cli <command> (--id=<app-id>|--name=<app-name>)
-                             [--platform=<platform>]
-                             [--bitness=<bitness>]
-                             [--language=<language>]
-                             [--games-dir=<directory>]
-                             [--steam-dir=<directory>]
+  Usage:
+    steam-cli login           [options]
+    steam-cli install         [options] (--id=<id>|--name=<name>)
+    steam-cli execute         [options] (--id=<id>|--name=<name>)
+    steam-cli show            [options] (--id=<id>|--name=<name>)
+    steam-cli list            [options]
+    steam-cli download-covers [options]
+    steam-cli update-cache    [options]
+    steam-cli categories      [options]
+
   Commands:
-    login               Login to steam and store credentials in keyring
+    login [auth-token]  Login to steam and store credentials in keyring
+                         (try login first without auth-token to trigger the email)
     install             Download and install game
     execute             Execute installed game
+    show                Show game details
     list                List all available games
+    download-covers     List all available games
     update-cache        Update cached game list
+    categories          List all game categories
 
-  Mandatory arguments:
-    -i, --id            AppID of the game
-    -n, --name          Name of the game
+    -i, --id=<id>       Appid of the game
+    -n, --name=<name>   Name of the game
 
-  Other arguments:
-    -p, --platform      Platform to install
-    -b, --bitness       Bitness of the platform
-    -l, --language      Language of the game to install
-    -g, --games-dir     Directory where to find installed games
-    -s, --steam-dir     Directory where to find steam [default: ~/.steam]
+  Options:
+    -p, --platform=<p>     Platform to install
+    -b, --bitness=<b>      Bitness of the platform
+    -l, --language=<l>     Language of the game to install
+    -g, --games-dir=<g>    Directory where to find installed games [default: ~/]
+    -s, --steam-dir=<s>    Directory where to find steam [default: ~/.steam]
+    -i, --install-dir=<g>  Directory where to install game
 
     --debug             Run in debug mode (mostly set -x)
     --gui <gui>         Choose the GUI to use for progress indication from the

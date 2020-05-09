@@ -20,6 +20,7 @@ Commands:
   list                List all available games
   download-covers     List all available games
   update-cache        Update cached game list
+  categories          List all game categories
 
   -i, --id=<id>       Appid of the game
   -n, --name=<name>   Name of the game
