@@ -9,6 +9,7 @@ Usage:
   steam-cli list            [options]
   steam-cli download-covers [options]
   steam-cli update-cache    [options]
+  steam-cli categories      [options]
 
 Commands:
   login [auth-token]  Login to steam and store credentials in keyring
@@ -174,6 +175,7 @@ class SteamClient:
     self._pkgs = None
     self._appids = None
     self._apps = None
+    self._cats = None
     self.progress = progress
 
   def load_cache(self):
@@ -395,6 +397,55 @@ class SteamClient:
   def demos(self):
     return dict(self.apps_by_type('demo'))
 
+  @property
+  def cats(self):
+    if not self._cats:
+      import leveldb
+
+      shutil.rmtree(os.path.join(CACHE_DIR, 'leveldb'))
+      shutil.copytree(os.path.join(STEAM_DIR, 'steam/config/htmlcache/Local Storage/leveldb'),
+                      os.path.join(CACHE_DIR, 'leveldb'))
+      db = leveldb.LevelDB(os.path.join(CACHE_DIR, 'leveldb'))
+
+      keys = []
+      for k,v in db.RangeIter():
+        if not b'\x00\x01' in k:
+          continue
+
+        site, key = k.split(b'\x00\x01')
+        if site != b'_https://steamloopback.host':
+          continue
+
+        if b'-cloud-storage-namespace-' in key and not b'.modified' in key:
+          assert(v[0] == 1)
+          keys.append(k)
+
+      self._cats = dict((i,[]) for i in self.appids)
+      for k in keys:
+        v = []
+
+        for kk,vv in json.loads(db.Get(k)[1:]):
+          if 'is_deleted' in vv and vv['is_deleted']:
+            print('deleted: {}'.format(vv))
+            pass
+          elif not 'value' in vv or not 'key' in vv:
+            print('unknown: {}'.format(vv))
+            pass
+          elif vv['key'] == 'collection-bootstrap-complete':
+            pass
+          else:
+            vvv = json.loads(vv['value'])
+            if not isinstance(vvv, dict) or not 'added' in vvv:
+              continue
+
+            for i in vvv['added']:
+              if i in self._cats:
+                self._cats[i] += [vvv['name'].title()]
+              else:
+                print('{}: unknown app:{}'.format(vvv['name'], i))
+
+    return self._cats
+
   async def _download_covers(self, s, i, k, v, sem, pct):
     SOURCE = 'https://steamcdn-a.akamaihd.net/steam{}/apps/{}/{}.{}'
     TARGET = os.path.join(CACHE_DIR, '{}/{}.{}')
@@ -531,6 +582,12 @@ class SteamClient:
     elif 'windows' in config['config']['oslist']:
       subprocess.run(['wine', cmd])
 
+  def categories(self):
+    for k,v in sorted(self.games.items(), key=lambda p: p[1]['common']['name']):
+      print(v['common']['name'])
+      for c in self.cats[k]:
+        print(' ', c)
+
 
 def main():
   args = docopt.docopt(__doc__, version='steam-cli v1.0.0')
@@ -557,6 +614,8 @@ def main():
       asyncio.run(client.download_covers())
     elif args['update-cache']:
       client.update_cache()
+    elif args['categories']:
+      client.categories()
     else:
       print(args)
 
