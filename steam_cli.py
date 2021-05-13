@@ -144,15 +144,15 @@ async def download(session, source, target):
 
   async with session.get(source, allow_redirects=True) as r:
     if 200 <= r.status < 300:
-      print('Downloading {} to {}'.format(source, target))
+      print(f'Downloading {source} to {target}')
       open(target, 'wb').write(await r.read())
     else:
-      print('Missing {}'.format(source))
+      print(f'Missing {source}')
       open(target + '~', 'wb').write(bytes())
 
 
 async def execute(cmd, *args, **kwargs):
-  print('Executing "{}"'.format(cmd))
+  print(f'Executing "{cmd}"')
   proc = await asyncio.create_subprocess_shell(cmd, *args, **kwargs)
   stdout, stderr = await proc.communicate()
   return (proc.returncode,
@@ -273,7 +273,7 @@ class SteamClient:
       else:
         username = input('Username: ')
 
-      self.steam.sendline('login {}'.format(username))
+      self.steam.sendline(f'login {username}')
       self.progress(0, 'Login')
       self.expect([r'password:', r"Steam Guard code:", r'Two-factor code:',
                    r'Logged in OK\r\n',
@@ -306,7 +306,7 @@ class SteamClient:
     return self._pkgids
 
   def on_pkg(self, i, s):
-    with open(os.path.join(CACHE_DIR, 'pkg-{}.vdf'.format(i)), 'wb') as f:
+    with open(os.path.join(CACHE_DIR, f'pkg-{i}.vdf'), 'wb') as f:
       f.write(s)
     self._pkgs[i] = vdf.loads(trydecode(s))
     self.progress(100 * len(self._pkgs) / len(self._pkgids))
@@ -321,14 +321,14 @@ class SteamClient:
 
       with tempfile.NamedTemporaryFile(mode='w+') as s:
         for i in self.pkgids:
-          cache = os.path.join(CACHE_DIR, 'pkg-{}.vdf'.format(i))
+          cache = os.path.join(CACHE_DIR, f'pkg-{i}.vdf')
           if os.path.exists(cache):
             self.on_pkg(i, open(cache, 'rb').read())
             continue
-          print('package_info_print {}'.format(i), file=s)
+          print(f'package_info_print {i}', file=s)
         s.flush()
 
-        self.steam.sendline('runscript "{}"'.format(s.name))
+        self.steam.sendline(f'runscript "{s.name}"')
         self.expect([r'"(\d+)"\r\n{\r\n((?:[^\n]*\r\n)*?)}\r\n'],
                     [lambda i, s: self.on_pkg(int(i), s)])
 
@@ -352,7 +352,7 @@ class SteamClient:
     return self._appids
 
   def on_app(self, i, s):
-    with open(os.path.join(CACHE_DIR, 'app-{}.vdf'.format(i)), 'wb') as f:
+    with open(os.path.join(CACHE_DIR, f'app-{i}.vdf'), 'wb') as f:
       f.write(s)
     self._apps[i] = vdf.loads(trydecode(s))
     self.progress(100 * len(self._apps) / len(self._appids))
@@ -367,14 +367,14 @@ class SteamClient:
 
       with tempfile.NamedTemporaryFile(mode='w+') as s:
         for i in self.appids:
-          cache = os.path.join(CACHE_DIR, 'app-{}.vdf'.format(i))
+          cache = os.path.join(CACHE_DIR, f'app-{i}.vdf')
           if os.path.exists(cache):
             self.on_app(i, open(cache, 'rb').read())
             continue
-          print('app_info_print {}'.format(i), file=s)
+          print(f'app_info_print {i}', file=s)
         s.flush()
 
-        self.steam.sendline('runscript "{}"'.format(s.name))
+        self.steam.sendline(f'runscript "{s.name}"')
         self.expect([r'"(\d+)"\r\n{\r\n((?:[^\n]*\r\n)*?)}\r\n'],
                     [lambda i, s: self.on_app(int(i), s)])
 
@@ -440,10 +440,10 @@ class SteamClient:
 
         for kk,vv in json.loads(db.get(k)[1:]):
           if 'is_deleted' in vv and vv['is_deleted']:
-            print('deleted: {}'.format(vv))
+            print(f'deleted: {vv}')
             pass
           elif not 'value' in vv or not 'key' in vv:
-            print('unknown: {}'.format(vv))
+            print(f'unknown: {vv}')
             pass
           elif vv['key'] == 'collection-bootstrap-complete':
             pass
@@ -567,7 +567,7 @@ class SteamClient:
       print(script.format(**kwargs), file=s)
       s.flush()
 
-      self.steam.sendline('runscript "{}"'.format(s.name))
+      self.steam.sendline(f'runscript "{s.name}"')
       self.expect([r'Update state .* (reconfiguring|downloading|validating), progress: ([\d]+).*\r\n',
                    r"Success! App '{id}' fully installed\.\r\n".format(**kwargs)],
                   [lambda txt, pct: self.progress(int(pct), titlecase(trydecode(txt))),
