@@ -414,15 +414,15 @@ class SteamClient:
   @property
   def cats(self):
     if not self._cats:
-      import leveldb
+      import plyvel
 
       shutil.rmtree(os.path.join(CACHE_DIR, 'leveldb'))
       shutil.copytree(self.steam_file('config/htmlcache/Local Storage/leveldb'),
                       os.path.join(CACHE_DIR, 'leveldb'))
-      db = leveldb.LevelDB(os.path.join(CACHE_DIR, 'leveldb'))
+      db = plyvel.DB(os.path.join(CACHE_DIR, 'leveldb'))
 
       keys = []
-      for k,v in db.RangeIter():
+      for k,v in db:
         if not b'\x00\x01' in k:
           continue
 
@@ -438,7 +438,7 @@ class SteamClient:
       for k in keys:
         v = []
 
-        for kk,vv in json.loads(db.Get(k)[1:]):
+        for kk,vv in json.loads(db.get(k)[1:]):
           if 'is_deleted' in vv and vv['is_deleted']:
             print('deleted: {}'.format(vv))
             pass
