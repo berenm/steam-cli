@@ -12,13 +12,12 @@ Usage:
   steam-cli categories      [options]
 
 Commands:
-  login [auth-token]  Login to steam and store credentials in keyring
-                       (try login first without auth-token to trigger the email)
+  login [auth-token]  Login to steam (without auth-token to trigger the email)
   install             Download and install game
   execute             Execute installed game
   show                Show game details
   list                List all available games
-  download-covers     List all available games
+  download-covers     Download game cover images
   update-cache        Update cached game list
   categories          List all game categories
 
