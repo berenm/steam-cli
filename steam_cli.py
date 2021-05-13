@@ -419,7 +419,8 @@ class SteamClient:
     if not self._cats:
       import plyvel
 
-      shutil.rmtree(os.path.join(CACHE_DIR, 'leveldb'))
+      if os.path.exists(os.path.join(CACHE_DIR, 'leveldb')):
+        shutil.rmtree(os.path.join(CACHE_DIR, 'leveldb'))
       shutil.copytree(self.steam_file('config/htmlcache/Local Storage/leveldb'),
                       os.path.join(CACHE_DIR, 'leveldb'))
       db = plyvel.DB(os.path.join(CACHE_DIR, 'leveldb'))
