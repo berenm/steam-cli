@@ -6,7 +6,7 @@ Usage:
   steam-cli install         [options] (--id=<id>|--name=<name>)
   steam-cli execute         [options] (--id=<id>|--name=<name>)
   steam-cli show            [options] (--id=<id>|--name=<name>)
-  steam-cli list            [options]
+  steam-cli list            [options] [--installed] [--disk-usage]
   steam-cli download-covers [options]
   steam-cli update-cache    [options]
   steam-cli categories      [options]
@@ -24,6 +24,9 @@ Commands:
 
   -i, --id=<id>       Appid of the game
   -n, --name=<name>   Name of the game
+
+  --installed         Only list installed games
+  --disk-usage        Print disk usage for each game
 
 Options:
   -p, --platform=<p>     Platform to install
@@ -529,9 +532,16 @@ class SteamClient:
 
     raise GameNotFoundError
 
-  def list(self):
+  def list(self, **kwargs):
     for a in sorted(self.games.values(), key=lambda g: g['common']['name']):
-      print(a['common']['name'])
+      kwargs['id'] = int(a['common']['gameid'])
+      install_dir = self.install_dir(**kwargs)
+      if not kwargs['installed'] or os.path.exists(install_dir):
+        if kwargs['disk_usage'] and os.path.exists(install_dir):
+          print(subprocess.check_output(['du','-sh', install_dir]).split()[0].decode('utf-8'), end='\t')
+        else:
+          print(' ', end='\t')
+        print(a['common']['name'])
 
   def show(self, **kwargs):
     kwargs['id'] = self.id(**kwargs)
@@ -617,7 +627,7 @@ def main():
     if args['login']:
       client.login()
     elif args['list']:
-      client.list()
+      client.list(**args)
     elif args['show']:
       client.show(**args)
     elif args['install']:
