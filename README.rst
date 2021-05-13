@@ -25,6 +25,7 @@ USAGE
     steam-cli download-covers [options]
     steam-cli update-cache    [options]
     steam-cli categories      [options]
+    steam-cli set-categories  [options]
 
   Commands:
     login [auth-token]  Login to steam (without auth-token to trigger the email)
@@ -35,6 +36,7 @@ USAGE
     download-covers     Download game cover images
     update-cache        Update cached game list
     categories          List all game categories
+    set-categories      Create or update game categories (all / proton ratings)
 
     -i, --id=<id>       Appid of the game
     -n, --name=<name>   Name of the game

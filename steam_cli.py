@@ -10,6 +10,7 @@ Usage:
   steam-cli download-covers [options]
   steam-cli update-cache    [options]
   steam-cli categories      [options]
+  steam-cli set-categories  [options]
 
 Commands:
   login [auth-token]  Login to steam (without auth-token to trigger the email)
@@ -20,6 +21,7 @@ Commands:
   download-covers     Download game cover images
   update-cache        Update cached game list
   categories          List all game categories
+  set-categories      Create or update game categories (all / proton ratings)
 
   -i, --id=<id>       Appid of the game
   -n, --name=<name>   Name of the game
@@ -521,6 +523,32 @@ class SteamClient:
       await asyncio.gather(*(self._download_covers(s, i, k, v, sem, pct)
                              for i,(k,v) in enumerate(self.games.items())))
 
+  async def _download_protondb(self, s, i, k, v, pct):
+    SOURCE = 'https://www.protondb.com/api/v1/reports/summaries/{}.json'
+    TARGET = os.path.join(CACHE_DIR, 'protondb/{}.json')
+
+    await download(s, SOURCE.format(k), TARGET.format(k))
+
+  async def download_protondb(self):
+    import aiohttp
+
+    connector = aiohttp.TCPConnector(limit=16)
+    pct = 100. / len(self.games)
+    async with aiohttp.ClientSession(connector=connector) as s:
+      await asyncio.gather(*(self._download_protondb(s, i, k, v, pct)
+                             for i,(k,v) in enumerate(self.games.items())))
+
+    ratings = {}
+
+    for i,(k,v) in enumerate(self.games.items()):
+      file = os.path.join(CACHE_DIR, f'protondb/{k}.json')
+      if not os.path.exists(file):
+        continue
+      with open(file, 'r') as f:
+        ratings[k] = json.load(f)
+
+    return ratings
+
   def id(self, **kwargs):
     if kwargs.get('id', None) and kwargs['id'] in self.apps:
       return int(kwargs['id'])
@@ -615,6 +643,112 @@ class SteamClient:
       for c in self.cats[k]:
         print(' ', c)
 
+  def set_categories(self):
+    import plyvel
+    db = plyvel.DB(self.steam_file('config/htmlcache/Local Storage/leveldb'))
+    pdb = asyncio.run(self.download_protondb())
+
+    keys = []
+    for k,v in db:
+      if not b'\x00\x01' in k:
+        continue
+
+      site, key = k.split(b'\x00\x01')
+      if site != b'_https://steamloopback.host':
+        continue
+
+      if b'-cloud-storage-namespace-' in key and not b'.modified' in key:
+        assert(v[0] == 1)
+        keys.append(k)
+
+    for k in keys:
+      cats = {}
+
+      for key, cat in json.loads(db.get(k)[1:]):
+        if not 'value' in cat or not 'key' in cat:
+          cats[key] = cat
+        elif cat['key'] == 'collection-bootstrap-complete':
+          cats[key] = cat
+        else:
+          val = json.loads(cat['value'])
+          if not isinstance(val, dict) or not 'added' in val:
+            cats[key] = cat
+            continue
+
+          name = val['name'] = val['name'].title()
+          id = val['id'] = f'from-tag-{name}'
+          key = cat['key'] = f'user-collections.{id}'
+          cats[key] = cat
+
+      def add_category(name):
+        id = f'from-tag-{name.title()}'
+        key = f'user-collections.{id}'
+        if key in cats: return
+        val = {'id': id, 'name': name.title(), 'added': [], 'removed': []}
+        cat = {'key': key, 'timestamp': 1584215160,
+               'conflictResolutionMethod': 'last-write',
+               'value': json.dumps(val, separators=(',',':'))}
+        cats[key] = cat
+        print(f'creating {name} category')
+
+      add_category('All')
+      add_category('Proton Unrated')
+      add_category('Proton Borked')
+      add_category('Proton Bronze')
+      add_category('Proton Silver')
+      add_category('Proton Gold')
+      add_category('Proton Platinum')
+
+      for key, cat in cats.items():
+        if 'is_deleted' in cat and cat['is_deleted']:
+          continue
+        elif not 'value' in cat or not 'key' in cat:
+          continue
+        elif cat['key'] == 'collection-bootstrap-complete':
+          continue
+        else:
+          val = json.loads(cat['value'])
+          if not isinstance(val, dict) or not 'added' in val:
+            continue
+
+          if 'All' == val['name']:
+            val['added'] = [i for i in self.games.keys()]
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          elif 'Proton Unrated' == val['name']:
+            val['added'] = [i for i in self.games.keys() if i not in pdb]
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          elif 'Proton Borked' == val['name']:
+            val['added'] = [i for i in self.games.keys()
+                            if i in pdb and pdb[i]['tier'] == 'borked']
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          elif 'Proton Bronze' == val['name']:
+            val['added'] = [i for i in self.games.keys()
+                            if i in pdb and pdb[i]['tier'] == 'bronze']
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          elif 'Proton Silver' == val['name']:
+            val['added'] = [i for i in self.games.keys()
+                            if i in pdb and pdb[i]['tier'] == 'silver']
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          elif 'Proton Gold' == val['name']:
+            val['added'] = [i for i in self.games.keys()
+                            if i in pdb and pdb[i]['tier'] == 'gold']
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          elif 'Proton Platinum' == val['name']:
+            val['added'] = [i for i in self.games.keys()
+                            if i in pdb and pdb[i]['tier'] == 'platinum']
+            cat['value'] = json.dumps(val, separators=(',',':'))
+
+          cats[key] = cat
+
+      cats = json.dumps([[key, cat] for key, cat in cats.items()],
+                        separators=(',',':'))
+      db.put(k, '\x01{}'.format(cats).encode('utf-8'), sync=True)
 
 def main():
   args = docopt.docopt(__doc__, version='steam-cli v1.0.0')
@@ -643,6 +777,8 @@ def main():
       client.update_cache()
     elif args['categories']:
       client.categories()
+    elif args['set-categories']:
+      client.set_categories()
     else:
       print(args)
 
