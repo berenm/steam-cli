@@ -523,7 +523,7 @@ class SteamClient:
 
   def id(self, **kwargs):
     if kwargs.get('id', None) and kwargs['id'] in self.apps:
-      return kwargs['id']
+      return int(kwargs['id'])
 
     elif kwargs.get('name', None):
       for a in self.apps.values():
@@ -531,7 +531,7 @@ class SteamClient:
         if not 'gameid' in a['common']: continue
         if not 'name' in a['common']: continue
         if kwargs['name'] == a['common']['name']:
-          return a['common']['gameid']
+          return int(a['common']['gameid'])
 
     raise GameNotFoundError
 
