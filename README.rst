@@ -4,16 +4,6 @@ steam-cli: better command-line interface for Steam
 Python script that allows you to interact with steam directly from the command
 line, in a better way than using steamcmd.
 
-DEPENDENCIES
---------------------------------------------------------------------------------
-
-steam-cli relies on the following tools, that should be available on your
-distribution:
-
-- ``python``
-- ``secret-tool`` (from libsecret-tools, for credential storage)
-- ``wine`` (optional)
-
 INSTALLATION
 --------------------------------------------------------------------------------
 
