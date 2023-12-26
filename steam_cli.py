@@ -62,7 +62,7 @@ import xdg
 import vdf
 
 STEAM_DIR = os.path.expandvars("$HOME/.steam")
-CACHE_DIR = os.path.join(xdg.XDG_CACHE_HOME, "steam-cli")
+CACHE_DIR = os.path.expandvars("$HOME/.cache/steam-cli")
 
 if not os.path.exists(CACHE_DIR):
   os.makedirs(CACHE_DIR)
